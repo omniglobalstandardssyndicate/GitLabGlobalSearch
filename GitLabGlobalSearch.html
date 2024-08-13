@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitLab Search Tool</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <script type="importmap">
+    {
+      "imports": {
+        "@material/web/": "https://esm.run/@material/web/"
+      }
+    }
+  </script>
+  <script type="module">
+    import '@material/web/all.js';
+    import {styles as typescaleStyles} from '@material/web/typography/md-typescale-styles.js';
+
+    document.adoptedStyleSheets.push(typescaleStyles.styleSheet);
+  </script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --md-sys-color-primary: #78909C;
+            --md-sys-color-secondary: green;
+            --md-sys-color-secondary-container: #84a4b47a;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #log {
+            white-space: pre-wrap;
+            background-color: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        #results h2 {
+            margin-bottom: 10px;
+        }
+        .snippet {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border: 1px solid #ddd;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .highlight {
+            background-color: yellow;
+        }
+        .content {
+            display: block;
+            overflow: hidden;
+        }
+        #resultsContainer
+        h1 {
+            font-family: roboto;
+            font-size: 88px;
+            font-style: normal;
+            font-weight: 700;
+            letter-spacing: normal;
+            line-height: 96px;
+            text-transform: none;
+            color: #222;
+        }
+        h2 {
+            font-family: roboto;
+            font-size: 20px;
+            font-style: normal;
+            font-weight: 500;
+            letter-spacing: 1px;
+            line-height: 29px;
+            text-transform: none;
+        }
+        body {
+            font-family: roboto;
+            font-size: 15px;
+            font-style: normal;
+            font-weight: 500;
+            letter-spacing: 1px;
+            line-height: 15px;
+            text-transform: none;
+            color: #111;
+        }
+        div#resultsContainer > .row > .col {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+        }
+        div#resultsContainer > .row > .col > .toggle {
+            height: 100%;
+            cursor: pointer;
+            padding-right: 10px;
+        }
+        div#resultsContainer > .row > .col > .toggle > md-icon {
+            font-size: 36px;
+            --md-icon-size: 36px;
+            transition: transform 300ms ease-in-out;
+            transform: rotate(0deg);
+        }
+        div#resultsContainer > .row > .col > .content {
+            line-height: 25px;
+        }
+        div#resultsContainer > .row > .col > .content {
+            line-height: 25px;
+        }
+        div#resultsContainer > .row.collapsed > .col > .content {
+            overflow: hidden;
+            height: 50px;
+        }
+        div#resultsContainer > .row.collapsed > .col > .toggle > md-icon {transform: rotate(-90deg);}
+        div#resultsContainer > hr {
+            width: 95%;
+            height: 1px;
+            background: #CCC;
+            border: 0;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body class="container">
+    <div class="section">
+        <h1>GitLab Search Tool</h1>
+        <div class="row">
+            <div class="col s12 m4">
+                    <md-outlined-text-field id="keyword" label="Search Keyword"></md-outlined-text-field>
+            </div>
+            <div class="col s12 m4">
+                <md-outlined-text-field id="gitlab_url" label="GitLab URL"></md-outlined-text-field>
+            </div>
+            <div class="col s12 m4">
+                <md-outlined-text-field id="token" label="Private Token" type="password">
+                    <md-icon-button id="showToken" toggle slot="trailing-icon">
+                        <md-icon class="material-icons">visibility</md-icon>
+                        <md-icon class="material-icons" slot="selected">visibility_off</md-icon>
+                    </md-icon-button>
+                </md-outlined-text-field>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s12 m8">
+                <md-filled-button id="searchButton">Search</md-filled-button>
+                <md-filled-tonal-button id="stopButton" hidden>Stop Searching</md-filled-tonal-button>
+            </div>
+            <div class="col s12 m4">
+                <md-chip-set>
+                    <md-filter-chip id="rememberToken" label="Remember Token"></md-filter-chip>
+                </md-chip-set>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col s12">
+                <blockquote>
+                    Projects are cached for 30 days. If you need to refresh them click the "Clear Cach" button.
+                </blockquote>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+        <div class="row" style="display: grid;grid-template-columns: 100px 1fr;align-items: center;">
+            <div class="col" style="width: unset;">
+                <h2 style="margin: unset;">Log</h2>
+            </div>
+            <div class="col" style="grid-column-start: 3;">
+                <md-outlined-button id="clearLogs">Clear Logs</md-outlined-button>
+                <md-outlined-button id="clearCacheButton">Clear Cached Project List</md-outlined-button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col s12">
+                <div id="log"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section" id="results">
+        <div class="row" style="display: grid;grid-template-columns: 100px 1fr;align-items: center;">
+            <div class="col" style="width: unset;"">
+                <h2 style="margin: unset;">Results</h2>
+            </div>
+            <div class="col" >
+                <md-chip-set style="display: inline-flex;">
+                    <md-filter-chip id="preserveResults" label="Preserve Results"></md-filter-chip>
+                </md-chip-set>
+            </div>
+            <div class="col" style="grid-column-start: 4;">
+                <md-outlined-button id="collapseAllButton">Collapse All</md-outlined-button>
+                <md-outlined-button id="uncollapseAllButton" hidden>Uncollapse All</md-outlined-button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s12">
+                <div id="resultsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stopSearch = false;
+        const config = {};
+        const cacheKey = 'gitlabProjectsCache';
+        const cacheExpiryKey = 'gitlabProjectsCacheExpiry';
+        const cacheDuration = ( 24 * 60 * 60 * 1000 ) * 30; // 24 hours
+
+        if (localStorage.getItem('gitlabToken')){
+            document.getElementById("token").value = localStorage.getItem('gitlabToken');
+            document.getElementById("rememberToken").selected = true;   
+        }
+
+        if (localStorage.getItem("gitlabURL")){
+            document.getElementById("gitlab_url").value = localStorage.getItem("gitlabURL");
+        }
+
+        function getCachedProjects() {
+            const cachedProjects = localStorage.getItem(cacheKey);
+            const cacheExpiry = localStorage.getItem(cacheExpiryKey);
+            if (cachedProjects && cacheExpiry && new Date().getTime() < parseInt(cacheExpiry)) {
+                return JSON.parse(cachedProjects);
+            }
+            return null;
+        }
+
+        function setCachedProjects(projects) {
+            localStorage.setItem(cacheKey, JSON.stringify(projects));
+            localStorage.setItem(cacheExpiryKey, new Date().getTime() + cacheDuration);
+        }
+
+        function clearCachedProjects() {
+            localStorage.removeItem(cacheKey);
+            localStorage.removeItem(cacheExpiryKey);
+            logMessage('Cache cleared.');
+        }
+
+        async function fetchAllProjects(token) {
+            const cachedProjects = getCachedProjects();
+            if (cachedProjects) {
+                logMessage('Using cached projects data.');
+                return cachedProjects;
+            }
+
+            const apiUrl = `${config.gitlabURL}/api/v4/projects`;
+            const allProjects = [];
+            let page = 1;
+            const perPage = 100;
+
+            while (true) {
+                const response = await fetch(`${apiUrl}?page=${page}&per_page=${perPage}`, {
+                    headers: {
+                        'PRIVATE-TOKEN': token
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const projects = await response.json();
+                allProjects.push(...projects);
+
+                if (projects.length < perPage) {
+                    break; // No more pages
+                }
+
+                page++;
+            }
+
+            setCachedProjects(allProjects);
+            return allProjects;
+        }
+
+        async function searchInProject(projectId, token, keyword) {
+            const apiUrl = `${config.gitlabURL}/api/v4/projects/${projectId}/search`;
+            const params = new URLSearchParams({
+                scope: 'blobs',
+                search: keyword
+            });
+
+            const response = await fetch(`${apiUrl}?${params}`, {
+                headers: {
+                    'PRIVATE-TOKEN': token
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const results = await response.json();
+            return results;
+        }
+
+        function logMessage(message) {
+            const log = document.getElementById('log');
+            log.textContent += message + '\n';
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function highlightMatch(line, keyword) {
+            const regex = new RegExp(`(${keyword})`, 'gi');
+            return line.replace(regex, '<span class="highlight">$1</span>');
+        }
+
+        function getLineSnippet(line, keyword, maxLength = 250) {
+            let snippet = line;
+
+            if (line.length >= 250) {
+                const keywordIndex = line.toLowerCase().indexOf(keyword.toLowerCase());
+                const start = Math.max(0, keywordIndex - maxLength / 2);
+                const end = Math.min(line.length, keywordIndex + keyword.length + maxLength / 2);
+
+                snippet = line.substring(start, end);
+
+                if (start > 0) {
+                    snippet = '... ' + snippet;
+                }
+                if (end < line.length) {
+                    snippet = snippet + ' ...';
+                }
+            }
+
+            return highlightMatch(snippet, keyword);
+        }
+
+        function displayResult(result, line, projectUrl, fileUrl, lineNumber) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultDiv = document.createElement('div');
+            resultDiv.classList.add('row');
+            resultDiv.innerHTML = `
+                <div class="col s12">
+                    <div class="toggle">
+                        <md-icon class="material-icons">arrow_drop_down</md-icon>
+                    </div>
+                    <div class="content">
+                        <strong>Project:</strong> <a href="${projectUrl}" target="_blank">${result.project.name}</a>
+                        <strong>Group:</strong> ${result.project.namespace.name}<br>
+                        <strong>File:</strong> <a href="${fileUrl}#L${lineNumber}" target="_blank">${result.filename}</a><br>
+                        <strong>Path:</strong> ${result.path}<br>
+                        <strong>Line:</strong><pre class="snippet">${line}</pre>
+                    </div>
+                </div>
+            `;
+            resultDiv.addEventListener( "click", event => {
+                let path = event.path || (event.composedPath && event.composedPath());
+
+                if (
+                    path.includes(event.target) &&
+                    path.find(element => element?.classList?.contains('toggle'))
+                ) {
+                    event.srcElement.closest("div.row").classList.toggle("collapsed");
+                }
+            });
+            
+            resultsContainer.appendChild(resultDiv);
+            resultsContainer.appendChild(document.createElement('hr'));
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('#resultsContainer .row').forEach(row => row.classList.add('collapsed'));
+            document.getElementById('collapseAllButton').setAttribute('hidden', true);
+            document.getElementById('uncollapseAllButton').removeAttribute('hidden');
+        }
+
+        function uncollapseAll() {
+            document.querySelectorAll('#resultsContainer .row').forEach(row => row.classList.remove('collapsed'));
+            document.getElementById('collapseAllButton').removeAttribute('hidden');
+            document.getElementById('uncollapseAllButton').setAttribute('hidden', true);
+        }
+
+        async function searchGitLab() {
+            document.getElementById('searchButton').setAttribute('hidden', true);
+            document.getElementById('stopButton').removeAttribute('hidden');
+
+            // auto-store gitlab url
+            localStorage.setItem("gitlabURL", document.getElementById("gitlab_url").value);
+            config.gitlabURL = localStorage.getItem("gitlabURL").replace(/\/$/, '');
+
+            const keyword = document.getElementById('keyword').value;
+            const token = document.getElementById('token').value;
+            stopSearch = false;
+
+            if ( document.getElementById('preserveResults').selected === false ) {
+                document.getElementById('resultsContainer').innerHTML = "";
+            }
+            
+            if (!keyword || !token) {
+                logMessage('Keyword and Private Token are required.');
+                return;
+            }
+
+            logMessage(`Searching for keyword: ${keyword}`);
+            logMessage('Fetching all projects...');
+
+            try {
+                const allProjects = await fetchAllProjects(token);
+                logMessage(`Total projects found: ${allProjects.length}`);
+
+                for (let i = 0; i < allProjects.length; i++) {
+                    const current_project = allProjects[i];
+
+                    if (stopSearch) {
+                        logMessage('Search stopped by user.');
+                        break;
+                    }
+
+                    logMessage(`Searching in project: ${current_project.name} (${i + 1} of ${allProjects.length})`);
+
+                    try {
+                        const results = await searchInProject(current_project.id, token, keyword);
+                        if (results.length > 0) {
+                            logMessage(`Found ${results.length} result(s) in project: ${current_project.name}`);
+                        }
+
+                        for (const result of results) {
+                            if (stopSearch) {
+                                logMessage('Search stopped by user.');
+                                break;
+                            }
+
+                            result.project = current_project;
+                            if (result?.data) {
+                                const matchedLine = result.data.split('\n').find(line => line.toLowerCase().includes(keyword.toLowerCase()));
+                                if ( !matchedLine ) {
+                                    logMessage(`False positives match found in project: ${current_project.name}, file: ${result.filename}`);
+                                    continue;
+                                }
+                                const highlightedLine = getLineSnippet(matchedLine, keyword);
+                                const projectUrl = `${config.gitlabURL}/${current_project.path_with_namespace}`;
+                                const fileUrl = `${config.gitlabURL}/${current_project.path_with_namespace}/-/blob/${result.ref}/${result.path}`;
+                                const lineNumber = result.startline;
+
+                                displayResult(result, highlightedLine, projectUrl, fileUrl, lineNumber);
+                                logMessage(`Found match in project: ${current_project.name}, file: ${result.filename}`);
+                            } else {
+                                logMessage(`Invalid line number in project: ${current_project.name}, file: ${result.filename}`);
+                            }
+                        }
+                    } catch (error) {
+                        logMessage(`Error searching in project ${current_project.id}: ${error.message}`);
+                        console.error(error, current_project, results);
+                    }
+                }
+
+                logMessage('Search complete.');
+            } catch (error) {
+                logMessage('Error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        function stopSearchFunction() {
+            stopSearch = true;
+            document.getElementById('searchButton').removeAttribute('hidden');
+            document.getElementById('stopButton').setAttribute('hidden', true);
+        }
+
+        function clearLogs() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function showToken() {
+            const tokenInput = document.getElementById('token');
+            const showTokenButton = document.getElementById('showToken');
+            const rememberTokenCheckbox = document.getElementById('rememberToken');
+
+            if (tokenInput.type === 'password') {
+                tokenInput.type = 'text';
+                showTokenButton.value = 'Hide Token';
+            } else {
+                tokenInput.type = 'password';
+                showTokenButton.value = 'Show Token';
+            }
+
+            rememberToken();
+        }
+
+        function rememberToken() {
+            const tokenInput = document.getElementById('token');
+            const rememberTokenCheckbox = document.getElementById('rememberToken');
+            
+            if (rememberTokenCheckbox.selected) {
+                localStorage.setItem('gitlabToken', tokenInput.value);
+            }else{
+                localStorage.removeItem('gitlabToken');
+            }
+        }
+
+        document.getElementById('searchButton').onclick = searchGitLab;
+        document.getElementById('stopButton').onclick = stopSearchFunction;
+        document.getElementById('collapseAllButton').onclick = collapseAll;
+        document.getElementById('uncollapseAllButton').onclick = uncollapseAll;
+        document.getElementById('clearCacheButton').onclick = clearCachedProjects;
+        document.getElementById('clearLogs').onclick = clearLogs;
+        document.getElementById('showToken').onclick = showToken;
+        document.getElementById('rememberToken').onclick = rememberToken;
+    </script>
+</body>
+</html>
